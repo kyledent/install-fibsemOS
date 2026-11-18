@@ -42,3 +42,27 @@ jobs:
       - run: python install.py --skip-autoscript --yes --env ci-fibsem
       - run: python verify.py --skip-autoscript --env ci-fibsem
       - run: conda run -n ci-fibsem python launch.py --list
+
+  bootstrap-from-zip:
+    # What a user does: unpack the ZIP GitHub serves and run bootstrap.cmd.
+    # git archive builds that ZIP (same .gitattributes: CRLF, export-ignore).
+    # A fresh --miniforge-dir forces the download + checksum + silent install.
+    name: bootstrap.cmd from the repo ZIP (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and unpack the download ZIP
+        shell: pwsh
+        run: |
+          git archive --format=zip --prefix=install_fibsem-os_win11-main/ -o "$env:RUNNER_TEMP\repo.zip" HEAD
+          Expand-Archive "$env:RUNNER_TEMP\repo.zip" -DestinationPath "$env:RUNNER_TEMP\unzipped"
+          $root = "$env:RUNNER_TEMP\unzipped\install_fibsem-os_win11-main"
+          if (Test-Path "$root\tests") { throw "tests/ should not be in the ZIP" }
+          $bytes = [IO.File]::ReadAllBytes("$root\bootstrap.cmd")
+          if (-not ($bytes -contains 13)) { throw "bootstrap.cmd in the ZIP is not CRLF" }
+      - name: bootstrap.cmd
+        shell: cmd
+        run: call "%RUNNER_TEMP%\unzipped\install_fibsem-os_win11-main\bootstrap.cmd" --miniforge-dir "%RUNNER_TEMP%\mf" --mpc-host 192.0.2.10 --skip-autoscript --yes --env ci-boot
+      - name: verify, with the fresh Miniforge not on PATH
+        shell: cmd
+        run: '"%RUNNER_TEMP%\mf\python.exe" "%RUNNER_TEMP%\unzipped\install_fibsem-os_win11-main\verify.py" --skip-autoscript --env ci-boot'

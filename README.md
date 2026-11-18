@@ -25,7 +25,8 @@ problems that tend to come up on locked-down Windows PCs.
 
 - Windows 10 or 11 on the support PC. Windows 7 cannot run Python 3.10+.
 - [Miniforge](https://conda-forge.org/download/), to get `conda`/`mamba`
-  without licensing conditions.
+  without licensing conditions. `bootstrap.cmd` installs it for you if it is
+  missing, with no administrator rights needed.
 - Network access from the support PC to the MPC on TCP 7520.
 - AutoScript server on the MPC, licensed and running. fibsemOS 0.5.x accepts
   AutoScript 4.7+; 0.6+ needs 4.9+.
@@ -34,40 +35,63 @@ problems that tend to come up on locked-down Windows PCs.
 - Internet access for the first install (PyPI). See
   [offline install](docs/troubleshooting.md#installing-on-a-pc-with-no-internet).
 
-## Quick start
+## Quick start (fresh PC, from the downloaded ZIP)
 
-Open a **Miniforge Prompt** in this folder (download the ZIP from GitHub, or
-`git clone` it).
+1. On GitHub choose **Code → Download ZIP**.
+2. Right-click the ZIP, choose **Properties**, tick **Unblock**, then OK. This
+   avoids Windows' "downloaded from the internet" warnings on every script.
+3. Extract it anywhere, e.g. `C:\fibsem-install`.
+4. Double-click **`bootstrap.cmd`** in the extracted folder.
 
-1. Set your microscope PC's address in `mpc.host`:
-   ```
-   copy config.example.json config.json
-   notepad config.json
-   ```
-2. Install. The wheels come from the MPC's share; use
-   `--wheels E:\PythonPackages` instead for a local copy:
-   ```
-   python install.py --from-mpc
-   ```
-3. Check the install (imports, driver status, TCP 7520), poll the instrument
-   read-only, and start AutoLamella:
-   ```
-   conda activate fibsem-os
-   python verify.py --check-network
-   python test_autoscript_poll.py
-   python launch.py
-   ```
+`bootstrap.cmd` installs Miniforge if the PC has no conda (current user only,
+checksum-verified). It then asks for the microscope PC's address and where the
+AutoScript wheels are, and installs everything. Pressing Enter at the wheels
+question reads them from the MPC's share.
+
+To run it without the questions, open a prompt in the extracted folder:
+
+```
+bootstrap.cmd --mpc-host 192.168.0.1 --from-mpc
+```
+
+`bootstrap.cmd` takes every `install.py` option, plus `--miniforge-dir DIR`
+to choose where Miniforge goes or which install to use.
+
+`--from-mpc` reads the MPC's `C$` share, which needs admin credentials there.
+Cache them once with `cmdkey`; see [docs/share-access.md](docs/share-access.md).
+
+## Afterwards
+
+Open the **Miniforge Prompt** from the Start menu, change to the extracted
+folder, then check the install (imports, driver status, TCP 7520), poll the
+instrument read-only, and start AutoLamella:
+
+```
+conda activate fibsem-os
+python verify.py --check-network
+python test_autoscript_poll.py
+python launch.py
+```
 
 In fibsemOS, connect with manufacturer **Thermo**, your MPC's address and port
 **7520**.
 
-`--from-mpc` reads the MPC's `C$` share, which needs admin credentials there.
-Cache them once with `cmdkey`; see [docs/share-access.md](docs/share-access.md).
+## Quick start (Miniforge already installed)
+
+From a Miniforge Prompt in the repository folder:
+
+```
+python install.py --mpc-host 192.168.0.1 --from-mpc
+```
+
+Use `--wheels E:\PythonPackages` instead of `--from-mpc` for a local copy of
+the wheel folder.
 
 ## The scripts
 
 | Script | Does |
 |---|---|
+| `bootstrap.cmd` / `bootstrap.ps1` | Finds or installs Miniforge, then runs `install.py` with it. The starting point on a fresh PC. |
 | `install.py` | Creates the env, installs the collections shim, fibsemOS (a pinned PyPI release or a source checkout) and the AutoScript client, then checks the imports. Safe to re-run. |
 | `verify.py` | Checks the env, the shim, every import, the fibsemOS AutoScript driver, and optionally TCP to the MPC. |
 | `launch.py` | Starts a fibsemOS app through `python.exe`, for PCs that block pip's `.exe` launchers. |
@@ -128,8 +152,14 @@ gate, detector SKIPs in the poll test, and offline installs.
 python -m pytest tests
 ```
 
-CI runs the unit tests on Linux and Windows, and a real `install.py` run on a
-Windows runner (without AutoScript).
+CI runs the unit tests on Linux and Windows and two real Windows installs, both
+without AutoScript. One runs `install.py` with Miniforge already present. The
+other builds the same ZIP GitHub serves, unpacks it, and runs `bootstrap.cmd`
+from it, which downloads and installs a fresh Miniforge.
+
+The downloaded ZIP leaves out `tests/` and `.github/` (`export-ignore` in
+`.gitattributes`). It also forces CRLF line endings on `.cmd` and `.ps1`
+files, which `cmd.exe` needs.
 
 ## Licence
 

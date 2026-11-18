@@ -3,6 +3,37 @@
 Problems met installing fibsemOS on locked-down Windows support PCs, and what
 the scripts do about them.
 
+## `bootstrap.cmd` problems
+
+**"Windows protected your PC" / "The publisher could not be verified".**
+Windows marked the files as downloaded. Click *More info → Run anyway*, or
+better: delete the extracted folder, right-click the ZIP → *Properties* →
+tick *Unblock*, and extract again. The bootstrap also unblocks the files it
+finds, so this only happens on the first run.
+
+**"running scripts is disabled on this system" or "is not digitally signed".**
+`bootstrap.cmd` already runs PowerShell with `-ExecutionPolicy Bypass` for its
+own process. If you still see this, a Group Policy enforces the policy, which
+overrides command-line settings. Install Miniforge yourself (or via IT) and use
+the Miniforge Prompt route in the README, which needs no PowerShell.
+
+**"Windows would not start the installer".** Software restriction policies
+block programs started from `%TEMP%`. Have IT install Miniforge (any
+location), then re-run `bootstrap.cmd`; it finds an existing installation.
+
+**"Could not download or install Miniforge".** No route to github.com, or a
+proxy. The bootstrap uses the Windows proxy settings and your Windows login.
+Otherwise download Miniforge from <https://conda-forge.org/download/> on
+another machine, install it, and re-run.
+
+**It installed to `C:\miniforge3`, not my profile.** conda does not support
+paths with spaces. If your profile path has one, the bootstrap installs to
+`C:\miniforge3` instead. Use `--miniforge-dir D:\somewhere` to choose.
+
+**Typing `python` opens the Microsoft Store.** That is Windows' placeholder,
+not a real Python. Run `bootstrap.cmd`, or use the Miniforge Prompt, where
+`python` is Miniforge's.
+
 ## `fibsem-autolamella-ui` / `fibsem_ui` will not start
 
 **Symptom:** the command is found but blocked, or nothing happens. The error

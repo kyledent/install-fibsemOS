@@ -31,6 +31,8 @@ def parse_args(cfg):
         description="Install fibsemOS + the AutoScript client on a Windows support PC.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    p.add_argument("--mpc-host", metavar="HOST",
+                   help="microscope PC address; saved to config.json for the other scripts")
     p.add_argument("--env", default=cfg["env_name"],
                    help=f"conda env to create or update (default: {cfg['env_name']})")
     p.add_argument("--python", default=cfg["python_version"],
@@ -129,18 +131,40 @@ def pick_wheel_source(args, cfg):
         if Path(candidate).is_dir() and c.find_wheel(candidate, c.REQUIRED_WHEELS[0]):
             c.info(f"Found AutoScript wheels in {candidate}")
             return candidate
-    if args.yes or not sys.stdin.isatty():
+    if not interactive(args):
         return None
-    print("\n  Where are the AutoScript wheels? On the microscope PC they are in")
-    print(r"    C:\Program Files\Thermo Scientific AutoScript\PythonPackages")
-    print(f"  Over the network that is usually {c.resolve_share(cfg)}")
-    answer = input("  Folder (blank to skip): ").strip().strip('"')
-    return answer or None
+    share = c.resolve_share(cfg)
+    print("\n  Where are the AutoScript client wheels?")
+    print(f"    Enter        the microscope PC's share: {share}")
+    print(r"    a folder     e.g. E:\PythonPackages (a copy of that folder)")
+    print("    skip         install them later with install_autoscript_wheels.py")
+    answer = input("  > ").strip().strip('"')
+    if answer.lower() == "skip":
+        return None
+    return answer or share
+
+
+def interactive(args):
+    return not args.yes and sys.stdin.isatty()
+
+
+def settle_host(args, cfg):
+    """Save --mpc-host, or ask for the address on a first interactive run."""
+    host = args.mpc_host
+    if not host and interactive(args) and not c.CONFIG_FILE.exists():
+        print(f"\n  Microscope PC (MPC) address, as fibsemOS will connect to it.")
+        host = input(f"  [{cfg['mpc']['host']}] > ").strip() or cfg["mpc"]["host"]
+    if host:
+        c.save_host(host)
+        c.ok(f"Microscope PC {host} saved to {c.CONFIG_FILE.name}.")
+        return c.load_config()
+    return cfg
 
 
 def main():
     cfg = c.load_config()
     args = parse_args(cfg)
+    cfg = settle_host(args, cfg)
     conda = c.require_conda()
 
     c.header("install_fibsem-os_win11")

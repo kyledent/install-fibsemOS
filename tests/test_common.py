@@ -130,3 +130,39 @@ def test_active_env_ignores_base(monkeypatch, value, expected):
     else:
         monkeypatch.setenv("CONDA_DEFAULT_ENV", value)
     assert c.active_env() == expected
+
+
+def test_save_host_keeps_other_keys(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"env_name": "mine", "mpc": {"port": 7521}}))
+    c.save_host("10.0.0.9", path)
+    data = json.loads(path.read_text())
+    assert data == {"env_name": "mine", "mpc": {"port": 7521, "host": "10.0.0.9"}}
+
+
+def test_save_host_creates_config(tmp_path):
+    path = tmp_path / "config.json"
+    c.save_host("10.0.0.9", path)
+    assert c.load_config(path)["mpc"]["host"] == "10.0.0.9"
+
+
+def test_conda_found_beside_interpreter_when_not_on_path(monkeypatch, tmp_path):
+    # A fresh Miniforge run through its own python.exe, PATH untouched.
+    (tmp_path / "Scripts").mkdir()
+    (tmp_path / "Scripts" / "conda.exe").write_bytes(b"")
+    monkeypatch.setattr(c.sys, "platform", "win32")
+    monkeypatch.setattr(c.sys, "prefix", str(tmp_path))
+    monkeypatch.setattr(c.shutil, "which", lambda name: None)
+    monkeypatch.delenv("CONDA_EXE", raising=False)
+    assert c.conda_cmd() == str(tmp_path / "Scripts" / "conda.exe")
+
+
+def test_conda_exe_env_var_is_last_resort(monkeypatch, tmp_path):
+    exe = tmp_path / "conda"
+    exe.write_bytes(b"")
+    monkeypatch.setattr(c.sys, "prefix", str(tmp_path / "elsewhere"))
+    monkeypatch.setattr(c.shutil, "which", lambda name: None)
+    monkeypatch.setenv("CONDA_EXE", str(exe))
+    assert c.conda_cmd() == str(exe)
+    monkeypatch.delenv("CONDA_EXE")
+    assert c.conda_cmd() is None

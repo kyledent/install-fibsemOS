@@ -1,0 +1,14 @@
+# Python, Markdown, JSON: LF in the repo, native on checkout.
+* text=auto
+
+# cmd.exe misreads some LF-only batch files; PowerShell 5.1 prefers CRLF.
+# git archive (and so GitHub's "Download ZIP") applies these too.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Not needed by someone installing from the downloaded zip.
+.github/       export-ignore
+tests/         export-ignore
+.gitattributes export-ignore
+.gitignore     export-ignore

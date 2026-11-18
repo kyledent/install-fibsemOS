@@ -72,6 +72,14 @@ def _merge(base, override):
     return out
 
 
+def save_host(host, path=CONFIG_FILE):
+    """Record the microscope PC address in config.json, keeping its other keys."""
+    path = Path(path)
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    data.setdefault("mpc", {})["host"] = host
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
 def load_config(path=CONFIG_FILE):
     """Return DEFAULTS overlaid with config.json, if one exists."""
     path = Path(path)
@@ -102,6 +110,17 @@ def conda_cmd():
         path = shutil.which(name)
         if path:
             return path
+    # Not on PATH, e.g. a fresh Miniforge installed without touching PATH and
+    # run through its own python.exe: look beside this interpreter, then at
+    # what an activated prompt exports.
+    root = Path(sys.prefix)
+    if sys.platform == "win32":
+        beside = [root / "Library" / "bin" / "mamba.exe", root / "Scripts" / "conda.exe"]
+    else:
+        beside = [root / "bin" / "mamba", root / "bin" / "conda"]
+    for candidate in beside + [Path(os.environ.get("CONDA_EXE", ""))]:
+        if candidate.name and candidate.is_file():
+            return str(candidate)
     return None
 
 
