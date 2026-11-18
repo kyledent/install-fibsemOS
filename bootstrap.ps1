@@ -180,7 +180,16 @@ Say "Running install.py $($Forward -join ' ')"
 $code = $LASTEXITCODE
 
 if ($code -eq 0) {
+    # The env install.py used: --env if given, else config.json's, else the default.
+    $envName = 'fibsem-os'
+    $config = Join-Path $RepoDir 'config.json'
+    if (Test-Path -LiteralPath $config) {
+        $fromConfig = (Get-Content -LiteralPath $config -Raw | ConvertFrom-Json).env_name
+        if ($fromConfig) { $envName = $fromConfig }
+    }
+    $at = [array]::IndexOf($Forward, '--env')
+    if ($at -ge 0 -and $at + 1 -lt $Forward.Count) { $envName = $Forward[$at + 1] }
     Say "Next time, open the Miniforge Prompt (Start menu) or run:"
-    Say "  `"$root\Scripts\activate.bat`" fibsem-os"
+    Say "  `"$root\Scripts\activate.bat`" $envName"
 }
 exit $code
