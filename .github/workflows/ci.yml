@@ -41,7 +41,8 @@ jobs:
           activate-environment: ""
       - run: python install.py --skip-autoscript --yes --env ci-fibsem
       - run: python verify.py --skip-autoscript --env ci-fibsem
-      - run: conda run -n ci-fibsem python launch.py --list
+      # From base, which has no fibsemOS: exercises launch.py's re-run in the env.
+      - run: python launch.py --list --env ci-fibsem
 
   bootstrap-from-zip:
     # What a user does: unpack the ZIP GitHub serves and run bootstrap.cmd.

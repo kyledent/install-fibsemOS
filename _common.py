@@ -134,56 +134,75 @@ def require_conda():
     return conda
 
 
-_RUN_FLAGS = None
-
-
-def run_flags(conda):
-    """['--no-capture-output'] where `<conda> run` supports it, else [].
-
-    conda and mamba 1.x accept the flag (it streams output live); mamba 2.x
-    removed it and rejects it as an unknown command.
-    """
-    global _RUN_FLAGS
-    if _RUN_FLAGS is None:
-        try:
-            r = subprocess.run([conda, "run", "--help"],
-                               capture_output=True, text=True, timeout=30)
-            text = (r.stdout or "") + (r.stderr or "")
-            _RUN_FLAGS = ["--no-capture-output"] if "--no-capture-output" in text else []
-        except (OSError, subprocess.SubprocessError):
-            _RUN_FLAGS = []
-        if not _RUN_FLAGS:
-            info(f"{Path(conda).name} run has no --no-capture-output (mamba 2.x?); "
-                 "output appears when each step finishes.")
-    return _RUN_FLAGS
-
-
-def run(cmd, check=True, capture=False):
+def run(cmd, check=True, capture=False, env=None):
     print(f"  > {' '.join(str(c) for c in cmd)}")
     return subprocess.run([str(c) for c in cmd], check=check,
-                          capture_output=capture, text=True)
+                          capture_output=capture, text=True, env=env)
 
 
-def conda_run(conda, env, args, check=True, capture=False):
-    """Run a command inside a conda env without activating it."""
-    flags = [] if capture else run_flags(conda)
-    cmd = [conda, "run", "-n", env] + flags + [str(a) for a in args]
-    if capture:
-        return subprocess.run(cmd, check=check, capture_output=True, text=True)
-    return run(cmd, check=check)
-
-
-def list_conda_envs(conda):
-    """Env names known to conda. Uses --json: its text output differs between
-    conda, mamba 1.x and mamba 2.x."""
+def list_env_prefixes(conda):
+    """Full paths of the conda envs. Uses --json: the text output of
+    `info --envs` differs between conda, mamba 1.x and mamba 2.x."""
     try:
         r = subprocess.run([conda, "info", "--envs", "--json"],
                            capture_output=True, text=True, timeout=60)
         if r.returncode != 0:
             return []
-        return [Path(p).name for p in json.loads(r.stdout).get("envs", [])]
+        return [Path(p) for p in json.loads(r.stdout).get("envs", [])]
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
         return []
+
+
+def list_conda_envs(conda):
+    """Env names known to conda."""
+    return [p.name for p in list_env_prefixes(conda)]
+
+
+def env_prefix(conda, env):
+    """The env's folder, or None."""
+    for prefix in list_env_prefixes(conda):
+        if prefix.name == env:
+            return prefix
+    return None
+
+
+def env_environ(prefix):
+    """os.environ as `conda activate` would set it for prefix: its tools first
+    on PATH (Windows also needs the Library folders, for DLLs)."""
+    prefix = Path(prefix)
+    if sys.platform == "win32":
+        dirs = [prefix, prefix / "Library" / "mingw-w64" / "bin", prefix / "Library" / "usr" / "bin",
+                prefix / "Library" / "bin", prefix / "Scripts", prefix / "bin"]
+    else:
+        dirs = [prefix / "bin"]
+    environ = dict(os.environ)
+    environ["PATH"] = os.pathsep.join(str(d) for d in dirs) + os.pathsep + environ.get("PATH", "")
+    environ["CONDA_PREFIX"] = str(prefix)
+    environ["CONDA_DEFAULT_ENV"] = prefix.name
+    environ.pop("PYTHONHOME", None)
+    return environ
+
+
+def conda_run(conda, env, args, check=True, capture=False):
+    """Run a command from a conda env, as if the env were activated.
+
+    Deliberately not `conda run`: on Windows that writes the command into a
+    temporary .bat file, which splits multi-line `python -c` code into separate
+    cmd.exe lines and mangles % ^ & | < > and quotes; mamba 2.x also buffers all
+    output until the command ends. Starting the env's own executable with the
+    env's PATH has neither problem.
+    """
+    prefix = env_prefix(conda, env)
+    if prefix is None:
+        err(f"Conda env '{env}' not found.")
+        sys.exit(1)
+    environ = env_environ(prefix)
+    args = [str(a) for a in args]
+    exe = shutil.which(args[0], path=environ["PATH"]) or args[0]
+    cmd = [exe] + args[1:]
+    if capture:
+        return subprocess.run(cmd, check=check, capture_output=True, text=True, env=environ)
+    return run(cmd, check=check, env=environ)
 
 
 def conda_env_exists(conda, env):

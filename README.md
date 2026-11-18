@@ -117,7 +117,8 @@ default **0.5.3**, the latest stable release when this was written).
 To reproduce an install you know works, save its versions once:
 
 ```
-conda run -n fibsem-os python -m pip freeze > constraints.txt
+conda activate fibsem-os
+python -m pip freeze > constraints.txt
 ```
 
 Install elsewhere with `python install.py --constraints constraints.txt`.

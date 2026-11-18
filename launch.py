@@ -33,9 +33,8 @@ def fibsem_scripts():
 
 
 def relaunch_in_env(env):
-    """fibsemOS is not in this Python: re-run inside env via conda run."""
+    """fibsemOS is not in this Python: re-run this script with the env's python."""
     import os
-    import subprocess
 
     import _common as c
     if os.environ.get("FIBSEM_LAUNCH_RELAUNCHED"):
@@ -44,8 +43,9 @@ def relaunch_in_env(env):
     conda = c.require_conda()
     c.require_env(conda, env)
     c.info(f"fibsemOS is not in this Python; starting it in '{env}'.")
-    cmd = [conda, "run", "-n", env] + c.run_flags(conda) + ["python", __file__] + sys.argv[1:]
-    sys.exit(subprocess.call(cmd, env={**os.environ, "FIBSEM_LAUNCH_RELAUNCHED": "1"}))
+    os.environ["FIBSEM_LAUNCH_RELAUNCHED"] = "1"  # inherited by the child; stops a loop
+    r = c.conda_run(conda, env, ["python", __file__] + sys.argv[1:], check=False)
+    sys.exit(r.returncode)
 
 
 def main():

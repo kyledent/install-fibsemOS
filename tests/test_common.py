@@ -96,15 +96,44 @@ def test_mamba_preferred_and_full_path_returned(monkeypatch):
     assert c.conda_cmd() == "/opt/mf/bin/mamba"
 
 
-@pytest.mark.parametrize("help_text, expected", [
-    ("usage: conda run ... --no-capture-output ...", ["--no-capture-output"]),
-    ("usage: mamba run [OPTIONS] COMMAND", []),
-])
-def test_run_flags_follow_help_text(monkeypatch, help_text, expected):
-    monkeypatch.setattr(c, "_RUN_FLAGS", None)
-    monkeypatch.setattr(c.subprocess, "run",
-                        lambda *a, **k: SimpleNamespace(stdout=help_text, stderr="", returncode=0))
-    assert c.run_flags("conda") == expected
+def test_conda_run_starts_env_executable_directly(monkeypatch, tmp_path):
+    # Not `conda run`: the env's own python, with the env's PATH, args as given.
+    prefix = tmp_path / "envs" / "fibsem-os"
+    bindir = prefix / ("Scripts" if c.sys.platform == "win32" else "bin")
+    bindir.mkdir(parents=True)
+    monkeypatch.setattr(c, "list_env_prefixes", lambda conda: [tmp_path, prefix])
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"], seen["env"] = cmd, kw["env"]
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    monkeypatch.setattr(c.subprocess, "run", fake_run)
+    monkeypatch.setattr(c.shutil, "which",
+                        lambda name, path=None: str(bindir / name) if path else None)
+
+    code = "a = 1\nprint(a % 2, '&', \"^\")"
+    c.conda_run("conda", "fibsem-os", ["python", "-c", code], capture=True)
+    assert seen["cmd"] == [str(bindir / "python"), "-c", code]  # multi-line code intact
+    assert seen["env"]["CONDA_PREFIX"] == str(prefix)
+    assert seen["env"]["PATH"].split(c.os.pathsep)[0] == str(
+        prefix if c.sys.platform == "win32" else prefix / "bin")
+
+
+def test_conda_run_unknown_env_exits(monkeypatch):
+    monkeypatch.setattr(c, "list_env_prefixes", lambda conda: [])
+    with pytest.raises(SystemExit):
+        c.conda_run("conda", "nope", ["python", "-V"])
+
+
+@pytest.mark.parametrize("platform, first", [("win32", ""), ("linux", "bin")])
+def test_env_environ_puts_env_tools_first(monkeypatch, tmp_path, platform, first):
+    monkeypatch.setattr(c.sys, "platform", platform)
+    monkeypatch.setenv("PYTHONHOME", "/elsewhere")
+    environ = c.env_environ(tmp_path / "e")
+    assert environ["PATH"].split(c.os.pathsep)[0] == str(tmp_path / "e" / first).rstrip("/\\")
+    assert "PYTHONHOME" not in environ
+    if platform == "win32":
+        assert str(tmp_path / "e" / "Library" / "bin") in environ["PATH"]
 
 
 def test_list_envs_reads_json(monkeypatch):

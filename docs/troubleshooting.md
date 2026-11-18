@@ -56,14 +56,19 @@ would, so it works whichever fibsemOS release is installed. If `python.exe` in
 the env is blocked too, the env lives in a disallowed folder; ask IT to
 allow-list it, or create the env somewhere that is allowed.
 
-## `--no-capture-output` is not a recognised command
+## `conda run` / `mamba run` problems
 
-**Cause:** mamba 2.x removed the `--no-capture-output` flag that conda and
-mamba 1.x accept on `run`.
+You may see `--no-capture-output is not a recognised command` (mamba 2.x
+dropped that flag), output that only appears when a long step ends, or
+`'...' is not recognized as an internal or external command` when Python code
+is passed with `-c`. That last one happens because on Windows `conda run`
+writes the command into a temporary `.bat` file, which splits multi-line code
+and mangles `% ^ & |` and quotes.
 
-**Fix:** none needed. The scripts check `run --help` and only pass the flag
-when it is supported. Without it, each step's output appears when the step
-finishes rather than live.
+**Fix:** none needed. The scripts never use `conda run`. They start the env's
+own `python.exe` (or `git.exe`) with the PATH that `conda activate` would set,
+so arguments arrive intact and output streams live. Do the same in your own
+commands: `conda activate <env>`, then run `python ...`.
 
 ## `_winapi.CreateProcess(...)`: file not found
 
@@ -121,7 +126,8 @@ Carry `pkg` and your AutoScript wheels across, then on the offline PC:
 
 ```
 conda create -n fibsem-os python=3.11 pip -y
-conda run -n fibsem-os python -m pip install --no-index --find-links pkg "fibsem[ui]==0.5.3"
+conda activate fibsem-os
+python -m pip install --no-index --find-links pkg "fibsem[ui]==0.5.3"
 python install.py --wheels E:\PythonPackages
 ```
 
