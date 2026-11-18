@@ -1,0 +1,15 @@
+# Site-specific settings (host names, IPs) stay local.
+config.json
+
+# Thermo Fisher AutoScript is licensed software: never commit its files.
+*.whl
+PythonPackages/
+
+# --from-source clone, logs, Python cruft
+fibsem-os/
+*.log
+poll*.txt
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

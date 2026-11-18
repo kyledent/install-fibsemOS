@@ -1,0 +1,14 @@
+{
+  "mpc": {
+    "host": "192.168.0.1",
+    "port": 7520,
+    "wheel_share_template": "\\\\{host}\\C$\\Program Files\\Thermo Scientific AutoScript\\PythonPackages"
+  },
+  "env_name": "fibsem-os",
+  "python_version": "3.11",
+  "fibsem_version": "0.5.3",
+  "fibsem_extras": "ui",
+  "wheel_paths": ["E:\\PythonPackages", "D:\\PythonPackages"],
+  "source_repo": "https://github.com/fibsem-os/fibsem-os.git",
+  "source_ref": "main"
+}

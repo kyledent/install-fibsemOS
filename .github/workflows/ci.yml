@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    name: unit tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pytest
+      - run: python -m py_compile _common.py install.py verify.py launch.py install_autoscript_wheels.py check_autoscript_compat.py test_autoscript_poll.py shim/sitecustomize.py
+      - run: python -m pytest tests -v
+
+  install-smoke:
+    # A real install.py run on Windows with Miniforge (mamba 2.x): exercises the
+    # .exe lookup, the run-flag probe, env detection and the PyPI install.
+    # No AutoScript: the client is licensed and never in this repository.
+    name: install smoke test (windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          auto-activate-base: true
+          activate-environment: ""
+      - run: python install.py --skip-autoscript --yes --env ci-fibsem
+      - run: python verify.py --skip-autoscript --env ci-fibsem
+      - run: conda run -n ci-fibsem python launch.py --list
